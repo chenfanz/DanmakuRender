@@ -7,7 +7,7 @@
 
 旧版本可以在分支v1-v3找到。     
 
-全新的[DanmakuRender-5](https://github.com/SmallPeaches/DanmakuRender/tree/v5)已经推出，欢迎大家试用（可能有很多问题，暂时只推荐有编程能力的小伙伴使用）。
+全新的[DanmakuRender-5](https://github.com/SmallPeaches/DanmakuRender/tree/v5)已经推出，欢迎大家试用。
 
 ### 特别注意事项
 - Python3.10及以上版本录制斗鱼弹幕失败？      

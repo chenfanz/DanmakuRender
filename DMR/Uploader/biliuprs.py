@@ -13,9 +13,10 @@ from tools import ToolsList
 from DMR.utils import replace_keywords
 
 class biliuprs():
-    def __init__(self, cookies:str, account:str, debug=False, biliup:str=None, **kwargs) -> None:
+    def __init__(self, cookies:str=None, account:str=None, debug=False, biliup:str=None, **kwargs) -> None:
         self.biliup = biliup if biliup else ToolsList.get('biliup')
         self.account = account
+        assert cookies or account, 'cookies or account must be provided.'
         if cookies is None:
             self.cookies = f'./.temp/{account}.json'
         else:
@@ -49,6 +50,7 @@ class biliuprs():
         tag:str='',
         tid:int=65,
         title:str='',
+        timeout:int=None,
         logfile=None,
         **kwargs
     ):
@@ -94,7 +96,15 @@ class biliuprs():
         else:
             self.upload_proc = subprocess.Popen(upload_args, stdin=subprocess.PIPE, stdout=logfile, stderr=subprocess.STDOUT, bufsize=10**8)
 
-        self.upload_proc.wait()
+        try:
+            if timeout: 
+                self.upload_proc.wait(timeout=timeout)
+            else:
+                self.upload_proc.wait()
+        except subprocess.TimeoutExpired:
+            logging.warn(f'视频{video}上传超时，取消此次上传.')
+            self.upload_proc.kill()
+        
         return logfile
 
     def islogin(self):
@@ -120,7 +130,7 @@ class biliuprs():
 
     def upload_once(self, video, bvid=None, **config):
         with tempfile.TemporaryFile() as logfile:
-            self.upload_proc = self.call_biliuprs(video=video, bvid=bvid, logfile=logfile, **config)
+            self.call_biliuprs(video=video, bvid=bvid, logfile=logfile, **config)
             if self.debug:
                 return True, ''
 
