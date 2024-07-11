@@ -142,14 +142,14 @@ class AssWriter():
 
             # 格式化超级弹幕内容
             content_lines = []
-            for i in range(0, len(super_chat.content), 11):
-                content_lines.append(super_chat.content[i:i + 11])
+            for i in range(0, len(super_chat.content), 15):
+                content_lines.append(super_chat.content[i:i + 15])
             formatted_content = '\\N'.join(content_lines)
 
             dm_length = self._get_length(formatted_content)
             x0 = -100  # 初始X位置，负数表示从屏幕左侧外开始移动
             x1 = 0  # 最终X位置
-            y = 189 + len(self._super_chat_tails) * 60  # 固定起始Y位置，并逐条Super Chat堆叠
+            y = 189
 
             t0 = super_chat.time
             t1 = t0 + 0.25  # Super Chat 移动时间
