@@ -94,7 +94,7 @@ class Bilibili(DMAPI):
                         'DANMU_MSG': 'danmaku',
                         'WELCOME': 'enter',
                         'NOTICE_MSG': 'broadcast',
-                        # 'LIVE_INTERACTIVE_GAME': 'interactive_danmaku'  # 互动弹幕，与普通弹幕重复，已被弃用(#121)
+                        'SUPER_CHAT_MESSAGE': 'super_chat',  # 新增此行
                     }.get(j.get('cmd'), 'other')
 
                     if 'DANMU_MSG' in j.get('cmd'):
@@ -107,12 +107,13 @@ class Bilibili(DMAPI):
                         msg["color"] = f"{j.get('info', [[0, 0, 0, 16777215]])[0][3]:06x}"
                         msg["content"] = j.get("info")[1]
                         try:
-                            msg['time'] = datetime.fromtimestamp(j.get('info')[0][4]/1000)
+                            msg['time'] = datetime.fromtimestamp(j.get('info')[0][4] / 1000)
                             if j.get('info')[13] != r'{}':
                                 emoticon_info = j.get('info')[0][13]
                                 emoticon_url = emoticon_info['url']
                                 emoticon_desc = j.get('info')[1]
-                                msg["content"] = json.dumps({'url':emoticon_url,'desc':emoticon_desc},ensure_ascii=False)
+                                msg["content"] = json.dumps({'url': emoticon_url, 'desc': emoticon_desc},
+                                                            ensure_ascii=False)
                                 msg['msg_type'] = 'emoticon'
                         except:
                             pass
@@ -122,12 +123,22 @@ class Bilibili(DMAPI):
                         msg['name'] = j.get('data', {}).get('uname', '')
                         msg['content'] = j.get('data', {}).get('msg', '')
                         msg["color"] = 'ffffff'
-                        
+
                     elif msg["msg_type"] == "broadcast":
                         msg["type"] = j.get("msg_type", 0)
                         msg["roomid"] = j.get("real_roomid", 0)
                         msg["content"] = j.get("msg_common", "none")
                         msg["raw"] = j
+
+                    elif msg["msg_type"] == "super_chat":  # 新增此部分
+                        msg["name"] = j.get('data', {}).get('uinfo', {}).get('base', {}).get('name', '')
+                        msg["content"] = j.get('data', {}).get('message', '')
+                        msg["price"] = j.get('data', {}).get('price', 0)
+                        msg["color"] = j.get('data', {}).get('background_color', '#FFFFFF')
+                        try:
+                            msg['time'] = datetime.fromtimestamp(j.get('data', {}).get('ts', 0))
+                        except:
+                            msg['time'] = datetime.now()  # 如果没有时间戳，则使用当前时间
 
                     else:
                         msg["content"] = j
@@ -135,8 +146,5 @@ class Bilibili(DMAPI):
                     msg = {"name": "", "content": dm.get('body'), "msg_type": "other"}
                 msgs.append(msg)
             except Exception as e:
-                # traceback.print_exc()
-                # print(e)
                 pass
-
         return msgs

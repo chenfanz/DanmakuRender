@@ -91,17 +91,17 @@ class DanmakuWriter():
                 logging.error(e)
                 logging.error(f'弹幕 {old_dm_file} 分段失败.')
 
-    def dm_available(self,dm) -> bool:
-        if not (dm.get('msg_type') == 'danmaku'):
+    def dm_available(self, dm) -> bool:
+        if dm.get('msg_type') not in ['danmaku', 'super_chat']:
             return False
         if not dm.get('name'):
             return False
         if self.dm_filter:
             for dmf in self.dm_filter:
-                if dmf.search(dm.get('content','')):
+                if dmf.search(dm.get('content', '')):
                     return False
         return True
-    
+
     def start_dmc(self):
         async def danmu_monitor():
             q = asyncio.Queue()
@@ -116,7 +116,7 @@ class DanmakuWriter():
                 except Exception as e:
                     await dmc.stop()
                     logging.exception(e)
-                
+
             task = asyncio.create_task(dmc_task())
             last_dm_time = datetime.now().timestamp()
             retry = 0
@@ -126,20 +126,32 @@ class DanmakuWriter():
                     dm = q.get_nowait()
                     dm['time'] = datetime.now().timestamp() - self.part_start_time - self.dm_delay_fixed
                     if dm['time'] > 0 and self.dm_available(dm):
-                        danmu = SimpleDanmaku(
-                            time=dm['time'],
-                            dtype='danmaku',
-                            uname=dm['name'],
-                            color=dm['color'],
-                            content=dm['content']
-                        )
-                        retry = 0
-                        if self.dmwriter.add(danmu):
+                        if dm.get('msg_type') == 'danmaku':
+                            danmu = SimpleDanmaku(
+                                time=dm['time'],
+                                dtype='danmaku',
+                                uname=dm['name'],
+                                color=dm['color'],
+                                content=dm['content']
+                            )
+                            if self.dmwriter.add(danmu):
+                                last_dm_time = datetime.now().timestamp()
+                        elif dm.get('msg_type') == 'super_chat':
+                            danmu = SimpleDanmaku(
+                                time=dm['time'],
+                                dtype='super_chat',
+                                uname=dm['name'],
+                                color=dm['color'],
+                                content=dm['content'],
+                                price = dm['price']  # 传入 price 参数
+                            )
+                            self.dmwriter.add_super_chat(danmu)
                             last_dm_time = datetime.now().timestamp()
+                        retry = 0
                     continue
                 except asyncio.QueueEmpty:
                     pass
-                
+
                 if task.done():
                     logging.error('弹幕下载线程异常退出，正在重试...')
                     try:
@@ -149,17 +161,17 @@ class DanmakuWriter():
                     task.cancel()
                     retry += 1
                     last_dm_time = datetime.now().timestamp()
-                    await asyncio.sleep(min(15*retry,60))
+                    await asyncio.sleep(min(15 * retry, 60))
                     task = asyncio.create_task(dmc_task())
                     continue
 
-                if self.dm_auto_restart and datetime.now().timestamp()-last_dm_time>self.dm_auto_restart:
+                if self.dm_auto_restart and datetime.now().timestamp() - last_dm_time > self.dm_auto_restart:
                     logging.error('获取弹幕超时，正在重试...')
                     task.cancel()
                     last_dm_time = datetime.now().timestamp()
                     task = asyncio.create_task(dmc_task())
                     continue
-                
+
                 await asyncio.sleep(0.1)
             task.cancel()
             try:
