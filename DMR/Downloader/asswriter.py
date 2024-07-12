@@ -146,42 +146,26 @@ class AssWriter():
                 content_lines.append(super_chat.content[i:i + 15])
             formatted_content = '\\N'.join(content_lines)
 
-            dm_length = self._get_length(formatted_content)
-            x0 = -100  # 初始X位置，负数表示从屏幕左侧外开始移动
-            x1 = 0  # 最终X位置
-            y = 189
+            y = 200
 
             t0 = super_chat.time
-            t1 = t0 + 0.25  # Super Chat 移动时间
+            t1 = t0 + 20  # Super Chat 持续时间固定为20秒
 
-            t0_move = '%02d:%02d:%05.2f' % sec2hms(t0)
-            t1_move = '%02d:%02d:%05.2f' % sec2hms(t1)
-
-            t0_display = t1_move
-            t1_display = '%02d:%02d:%05.2f' % sec2hms(t1 + 20)  # Super Chat 持续时间固定为20秒
+            t0_display = '%02d:%02d:%05.2f' % sec2hms(t0)
+            t1_display = '%02d:%02d:%05.2f' % sec2hms(t1)
 
             # 构建 ASS 格式的弹幕信息
             dm_info = (
-                f'Dialogue: 0,{t0_move},{t1_move},message_box,,0000,0000,0000,,'
-                f'{{\\move({x0},{y},{x1},{y})\\c&HE5E5FF\\shad0\\p1}}m 0 12 b 0 6 6 0 12 0 l 238 0 b 244 0 250 6 250 12 l 250 51 l 0 51\n'
-                f'Dialogue: 0,{t0_move},{t1_move},message_box,,0000,0000,0000,,'
-                f'{{\\move({x0},{y + 51},{x1},{y + 51})\\shad0\\p1\\c&H8C8CF7}}m 0 0 l 250 0 l 250 44 b 250 50 244 56 238 56 l 12 56b 6 56 0 50 0 44\n'
-                f'Dialogue: 1,{t0_move},{t1_move},message_box,,0000,0000,0000,,'
-                f'{{\\move({x0 + 6},{y + 4},{x1 + 6},{y + 4})\\c&H0F0F75\\fs25\\b1\\q2}}{super_chat.uname}\n'
-                f'Dialogue: 1,{t0_move},{t1_move},message_box,,0000,0000,0000,,'
-                f'{{\\move({x0 + 6},{y + 29},{x1 + 6},{y + 29})\\c&H313131\\fs20\\q2}}SuperChat CNY {super_chat.price}\n'
-                f'Dialogue: 1,{t0_move},{t1_move},message_box,,0000,0000,0000,,'
-                f'{{\\move({x0 + 6},{y + 51},{x1 + 6},{y + 51})\\c&HFFFFFF\\q2}}{formatted_content}\n'
                 f'Dialogue: 0,{t0_display},{t1_display},message_box,,0000,0000,0000,,'
-                f'{{\\pos({x1},{y})\\clip(m 0 212 b 0 206 6 200 12 200 l 238 200 b 244 200 250 206 250 212 l 250 300 l 0 300)\\c&HE5E5FF\\shad0\\p1}}m 0 12 b 0 6 6 0 12 0 l 238 0 b 244 0 250 6 250 12 l 250 51 l 0 51\n'
+                f'{{\\pos(0,{y})\\c&HFF6600\\shad0\\p1}}m 0 0 l 250 0 l 250 81 l 0 81\n'
                 f'Dialogue: 0,{t0_display},{t1_display},message_box,,0000,0000,0000,,'
-                f'{{\\pos({x1},{y + 51})\\clip(m 0 212 b 0 206 6 200 12 200 l 238 200 b 244 200 250 206 250 212 l 250 300 l 0 300)\\shad0\\p1\\c&H8C8CF7}}m 0 0 l 250 0 l 250 44 b 250 50 244 56 238 56 l 12 56b 6 56 0 50 0 44\n'
+                f'{{\\pos(0,{y + 40})\\shad0\\p1\\c&HCC0000}}m 0 0 l 250 0 l 250 80 l 0 80\n'
                 f'Dialogue: 1,{t0_display},{t1_display},message_box,,0000,0000,0000,,'
-                f'{{\\pos({x1 + 6},{y + 4})\\clip(m 0 212 b 0 206 6 200 12 200 l 238 200 b 244 200 250 206 250 212 l 250 300 l 0 300)\\c&H0F0F75\\fs25\\b1\\q2}}{super_chat.uname}\n'
+                f'{{\\pos(6,{y + 5})\\c&HFFFFFF\\fs15\\b1\\q2}}{super_chat.uname}\n'
                 f'Dialogue: 1,{t0_display},{t1_display},message_box,,0000,0000,0000,,'
-                f'{{\\pos({x1 + 6},{y + 29})\\clip(m 0 212 b 0 206 6 200 12 200 l 238 200 b 244 200 250 206 250 212 l 250 300 l 0 300)\\c&H313131\\fs20\\q2}}SuperChat CNY {super_chat.price}\n'
+                f'{{\\pos(6,{y + 20})\\c&HFFFFFF\\fs15\\q2}}SuperChat CNY {super_chat.price}\n'
                 f'Dialogue: 1,{t0_display},{t1_display},message_box,,0000,0000,0000,,'
-                f'{{\\pos({x1 + 6},{y + 51})\\clip(m 0 212 b 0 206 6 200 12 200 l 238 200 b 244 200 250 206 250 212 l 250 300 l 0 300)\\c&HFFFFFF\\q2}}{formatted_content}\n'
+                f'{{\\pos(6,{y + 40})\\c&HFFFFFF\\q2}}{formatted_content}\n'
             )
 
             with open(self._filename, 'a', encoding='utf-8') as f:
