@@ -46,6 +46,8 @@ class AssWriter():
 
         self._lock = threading.Lock()
         self._super_chat_tails = []  # 初始化 _super_chat_tails 属性
+        self._super_chat_state = 0
+        self._latest_end_time = 0
         self._ntracks = int(((self.height - self.dst) * self.dmrate) / (self.fontsize + self.margin_h))
 
         self.meta_info = [
@@ -146,13 +148,23 @@ class AssWriter():
                 content_lines.append(super_chat.content[i:i + 15])
             formatted_content = '\\N'.join(content_lines)
 
-            y = 200
+            # 计算当前超级弹幕数量和更新最晚结束时间
+            current_time = super_chat.time
+            if current_time > self._latest_end_time:
+                self._super_chat_state = 0  # 重置状态
+            self._super_chat_state += 1
+            self._latest_end_time = current_time + 20  # 每个超级弹幕持续20秒
 
-            t0 = super_chat.time
+            # 根据当前状态计算 y 坐标
+            base_y = 100
+            y_offset = 120
+            y = base_y + (self._super_chat_state - 1) * y_offset
+
+            t0 = current_time
             t1 = t0 + 20  # Super Chat 持续时间固定为20秒
 
-            t0_display = '%02d:%02d:%05.2f' % sec2hms(t0)
-            t1_display = '%02d:%02d:%05.2f' % sec2hms(t1)
+            t0_display = '%02d:%02d:%05.2f' %sec2hms(t0)
+            t1_display = '%02d:%02d:%05.2f' %sec2hms(t1)
 
             # 构建 ASS 格式的弹幕信息
             dm_info = (
