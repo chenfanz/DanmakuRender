@@ -101,10 +101,10 @@ class FFmpegRender(BaseRender):
             alpha = 0.5  # 半透明度
 
             # 四个角落位置，使用 `mod(t, interval * 4)` 来控制显示顺序
-            top_left = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=24:x={margin}:y={margin}{fontfile}:enable='between(mod(t,{interval * 4}),0,{duration})'"
-            top_right = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=24:x=(w-text_w-{margin}):y={margin}{fontfile}:enable='between(mod(t,{interval * 4}),{interval},{interval + duration})'"
-            bottom_right = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=24:x=(w-text_w-{margin}):y=(h-text_h-{margin}){fontfile}:enable='between(mod(t,{interval * 4}),{interval * 2},{interval * 2 + duration})'"
-            bottom_left = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=24:x={margin}:y=(h-text_h-{margin}){fontfile}:enable='between(mod(t,{interval * 4}),{interval * 3},{interval * 3 + duration})'"
+            top_left = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=27:x={margin}:y={margin}{fontfile}:enable='between(mod(t,{interval * 4}),0,{duration})'"
+            top_right = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=27:x=(w-text_w-{margin}):y={margin}{fontfile}:enable='between(mod(t,{interval * 4}),{interval},{interval + duration})'"
+            bottom_right = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=27:x=(w-text_w-{margin}):y=(h-text_h-{margin}){fontfile}:enable='between(mod(t,{interval * 4}),{interval * 2},{interval * 2 + duration})'"
+            bottom_left = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=27:x={margin}:y=(h-text_h-{margin}){fontfile}:enable='between(mod(t,{interval * 4}),{interval * 3},{interval * 3 + duration})'"
 
             watermark_filters = ",".join([top_left, top_right, bottom_right, bottom_left])
             filter_str += f",{watermark_filters}"
