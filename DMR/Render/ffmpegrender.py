@@ -45,18 +45,50 @@ class FFmpegRender(BaseRender):
         ffmpeg_args = [self.ffmpeg, '-y']
         ffmpeg_args += self.hwaccel_args
 
-        # 定义视频编码设置
+        # solve bili dash
         gop = self.advanced_render_args.get('gop', 5)
-        dash_args = []
+        if gop:
+            try:
+                fps = eval(FFprobe.run_ffprobe(video)['streams'][0]['avg_frame_rate'])
+                gop = int(gop)
+                dash_args = [
+                    '-keyint_min', int(fps * gop),
+                    '-g', int(fps * gop)
+                ]
+            except Exception as e:
+                logging.warn(f'GOP 设置失败：{e}')
+                dash_args = []
+        else:
+            dash_args = []
 
         if self.output_resize:
-            scale_args = ['-s', self.output_resize]
+            if 'x' in str(self.output_resize):
+                scale_args = ['-s', self.output_resize]
+            else:
+                w, h = FFprobe.get_resolution(video)
+                if not (h and w):
+                    logging.warn(f'获取视频 {video} 分辨率失败, 将使用默认分辨率 1920x1080.')
+                    w, h = 1920, 1080
+                scale = float(self.output_resize)
+                w, h = int(w * scale), int(h * scale)
+                scale_args = ['-s', f'{w}x{h}']
         else:
             scale_args = []
 
-        # 自定义 video filter
-        filter_name = '-vf'
-        filter_str = f"subtitles=filename='{danmaku}'"
+        if platform.system().lower() == 'windows':
+            danmaku = danmaku.replace("\\", "/").replace(":/", "\\:/")
+
+        # 自定义video filter
+        if self.advanced_render_args.get('filter_complex'):
+            filter_name = '-filter_complex'
+            filter_str = self.advanced_render_args.get('filter_complex')
+            filter_str = replace_keywords(filter_str, {'DANMAKU': danmaku})
+        else:
+            filter_name = '-vf'
+            filter_str = 'subtitles=filename=\'%s\'' % danmaku
+            fps = self.advanced_render_args.get('fps')
+            if fps:
+                filter_str += ',fps=fps=%i' % int(fps)
 
         # 四个位置的水印滤镜，依次循环显示
         if self.watermark_text:

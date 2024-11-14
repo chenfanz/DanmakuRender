@@ -135,7 +135,7 @@ render:
 
   watermark_text: "默认水印"
 
-  font_path: "/System/Library/Fonts/PingFang.ttc"
+  font_path: "tools/PingFang.ttc"
 
   # 以下参数只适用于python渲染器
   # 渲染线程数（单个渲染器使用的进程数量），默认2
