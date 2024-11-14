@@ -21,7 +21,9 @@ class FFmpegRender(BaseRender):
                  aencoder: str,
                  aencoder_args: list,
                  output_resize: str,
-                 advanced_render_args: dict=None,
+                 advanced_render_args: dict = None,
+                 watermark_text: str = None,
+                 font_path: str = None,  # 添加字体文件路径
                  ffmpeg: str = None,
                  debug=False,
                  **kwargs
@@ -34,6 +36,8 @@ class FFmpegRender(BaseRender):
         self.aencoder_args = aencoder_args
         self.output_resize = output_resize
         self.advanced_render_args = advanced_render_args if isinstance(advanced_render_args, dict) else {}
+        self.watermark_text = watermark_text
+        self.font_path = font_path  # 新增字体路径
         self.ffmpeg = ffmpeg if ffmpeg else ToolsList.get('ffmpeg')
         self.debug = debug
 
@@ -41,51 +45,38 @@ class FFmpegRender(BaseRender):
         ffmpeg_args = [self.ffmpeg, '-y']
         ffmpeg_args += self.hwaccel_args
 
-        # solve bili dash
+        # 定义视频编码设置
         gop = self.advanced_render_args.get('gop', 5)
-        if gop:
-            try:
-                fps = eval(FFprobe.run_ffprobe(video)['streams'][0]['avg_frame_rate'])
-                gop = int(gop)
-                dash_args = [
-                    '-keyint_min', int(fps * gop),
-                    '-g', int(fps * gop)
-                ]
-            except Exception as e:
-                logging.warn(f'GOP 设置失败：{e}')
-                dash_args = []
-        else:
-            dash_args = []
+        dash_args = []
 
         if self.output_resize:
-            if 'x' in str(self.output_resize):
-                scale_args = ['-s', self.output_resize]
-            else:
-                w, h = FFprobe.get_resolution(video)
-                if not (h and w):
-                    logging.warn(f'获取视频 {video} 分辨率失败, 将使用默认分辨率 1920x1080.')
-                    w, h = 1920, 1080
-                scale = float(self.output_resize)
-                w, h = int(w*scale), int(h*scale)
-                scale_args = ['-s', f'{w}x{h}']
+            scale_args = ['-s', self.output_resize]
         else:
             scale_args = []
 
-        if platform.system().lower() == 'windows':
-            danmaku = danmaku.replace("\\", "/").replace(":/", "\\:/")
-        
-        # 自定义video filter
-        if self.advanced_render_args.get('filter_complex'):
-            filter_name = '-filter_complex'
-            filter_str = self.advanced_render_args.get('filter_complex')
-            filter_str = replace_keywords(filter_str, {'DANMAKU': danmaku})
-        else:
-            filter_name = '-vf'
-            filter_str = 'subtitles=filename=\'%s\'' % danmaku
-            fps = self.advanced_render_args.get('fps')
-            if fps:
-                filter_str += ',fps=fps=%i' % int(fps)
-        
+        # 自定义 video filter
+        filter_name = '-vf'
+        filter_str = f"subtitles=filename='{danmaku}'"
+
+        # 四个位置的水印滤镜，依次循环显示
+        if self.watermark_text:
+            interval = 30  # 每隔 30 秒出现
+            duration = 10  # 每次持续 10 秒
+            margin = 50  # 距离边缘 50 像素
+
+            fontfile = f":fontfile='{self.font_path}'" if self.font_path else ''
+            fontcolor = "white"
+            alpha = 0.5  # 半透明度
+
+            # 四个角落位置，使用 `mod(t, interval * 4)` 来控制显示顺序
+            top_left = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=24:x={margin}:y={margin}{fontfile}:enable='between(mod(t,{interval * 4}),0,{duration})'"
+            top_right = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=24:x=(w-text_w-{margin}):y={margin}{fontfile}:enable='between(mod(t,{interval * 4}),{interval},{interval + duration})'"
+            bottom_right = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=24:x=(w-text_w-{margin}):y=(h-text_h-{margin}){fontfile}:enable='between(mod(t,{interval * 4}),{interval * 2},{interval * 2 + duration})'"
+            bottom_left = f"drawtext=text='{self.watermark_text}':fontcolor={fontcolor}@{alpha}:fontsize=24:x={margin}:y=(h-text_h-{margin}){fontfile}:enable='between(mod(t,{interval * 4}),{interval * 3},{interval * 3 + duration})'"
+
+            watermark_filters = ",".join([top_left, top_right, bottom_right, bottom_left])
+            filter_str += f",{watermark_filters}"
+
         ffmpeg_args += [
             '-fflags', '+discardcorrupt',
             '-i', video,
@@ -108,13 +99,14 @@ class FFmpegRender(BaseRender):
 
         if to_stdout or self.debug:
             self.render_proc = subprocess.Popen(
-                ffmpeg_args, stdin=sys.stdin, stdout=sys.stdout, stderr=subprocess.STDOUT, bufsize=10**8)
+                ffmpeg_args, stdin=sys.stdin, stdout=sys.stdout, stderr=subprocess.STDOUT, bufsize=10 ** 8)
         else:
             self.render_proc = subprocess.Popen(
-                ffmpeg_args, stdin=subprocess.PIPE, stdout=logfile, stderr=subprocess.STDOUT, bufsize=10**8)
+                ffmpeg_args, stdin=subprocess.PIPE, stdout=logfile, stderr=subprocess.STDOUT, bufsize=10 ** 8)
 
         self.render_proc.wait()
         return logfile
+
 
     def render_one(self, video: str, danmaku: str, output: str, **kwargs):
         if not exists(video):
