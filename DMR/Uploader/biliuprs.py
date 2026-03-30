@@ -7,25 +7,26 @@ import sys
 import tempfile
 import time
 import subprocess
+import datetime
 
 from DMR.utils import replace_keywords, ToolsList, VideoInfo
 
 
 class biliuprs():
 
-    def __init__(self, 
-                 cookies:str=None, 
-                 account:str=None, 
-                 task_upload_lock:bool=True,
-                 debug=False, 
-                 biliup:str=None, 
+    def __init__(self,
+                 cookies: str = None,
+                 account: str = None,
+                 task_upload_lock: bool = True,
+                 debug=False,
+                 biliup: str = None,
                  **kwargs,
-    ) -> None:
+                 ) -> None:
         self.biliup = biliup if biliup else ToolsList.get('biliup')
 
         if not (cookies or account):
             raise ValueError('cookies or account must be set.')
-        
+
         if cookies is None:
             self.account = account
             self.cookies = f'.login_info/{account}.json'
@@ -50,26 +51,26 @@ class biliuprs():
     def __del__(self):
         self.stop()
 
-    def call_biliuprs(self, 
-        video, 
-        bvid:str=None,
-        copyright:int=1,
-        cover:str='',
-        desc:str='',
-        dtime:int=0,
-        dynamic:str='',
-        line:str=None,
-        limit:int=3,
-        no_reprint:int=1,
-        source:str='',
-        tag:str='',
-        tid:int=65,
-        title:str='',
-        extra_args:list=None,
-        timeout:int=None,
-        logfile=None,
-        **kwargs
-    ):
+    def call_biliuprs(self,
+                      video,
+                      bvid: str = None,
+                      copyright: int = 1,
+                      cover: str = '',
+                      desc: str = '',
+                      dtime: int = 0,
+                      dynamic: str = '',
+                      line: str = None,
+                      limit: int = 3,
+                      no_reprint: int = 1,
+                      source: str = '',
+                      tag: str = '',
+                      tid: int = 65,
+                      title: str = '',
+                      extra_args: list = None,
+                      timeout: int = None,
+                      logfile=None,
+                      **kwargs
+                      ):
         if bvid:
             upload_args = self.base_args + ['append', '--vid', bvid]
         else:
@@ -101,18 +102,20 @@ class biliuprs():
 
         upload_args = [str(x) for x in upload_args]
         self.logger.debug(f'biliuprs: {upload_args}')
-        
+
         if not logfile:
             logfile = sys.stdout
 
         if self.debug:
-            upload_proc = subprocess.Popen(upload_args, stdin=subprocess.PIPE, stdout=sys.stdout, stderr=subprocess.STDOUT, bufsize=10**8)
+            upload_proc = subprocess.Popen(upload_args, stdin=subprocess.PIPE, stdout=sys.stdout,
+                                           stderr=subprocess.STDOUT, bufsize=10 ** 8)
         else:
-            upload_proc = subprocess.Popen(upload_args, stdin=subprocess.PIPE, stdout=logfile, stderr=subprocess.STDOUT, bufsize=10**8)
-        
+            upload_proc = subprocess.Popen(upload_args, stdin=subprocess.PIPE, stdout=logfile, stderr=subprocess.STDOUT,
+                                           bufsize=10 ** 8)
+
         try:
             self._upload_procs[upload_proc.pid] = upload_proc
-            if timeout: 
+            if timeout:
                 upload_proc.wait(timeout=timeout)
             else:
                 upload_proc.wait()
@@ -121,12 +124,13 @@ class biliuprs():
         finally:
             upload_proc.kill()
             self._upload_procs.pop(upload_proc.pid)
-        
+
         return logfile
-    
+
     def islogin(self):
         renew_args = self.base_args + ['renew']
-        proc = subprocess.Popen(renew_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=10**8)
+        proc = subprocess.Popen(renew_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                bufsize=10 ** 8)
         out = proc.stdout.read()
         out = out.decode('utf-8')
 
@@ -145,7 +149,7 @@ class biliuprs():
             if self.islogin():
                 self.logger.info(f'将 {self.account} 的登录信息保存到 {self.cookies}.')
                 break
-        
+
         self.logger.error(f'{self.account} 登录失败!.')
 
     def upload_once(self, video, bvid=None, **config):
@@ -153,17 +157,17 @@ class biliuprs():
             self.call_biliuprs(video=video, bvid=bvid, logfile=logfile, **config)
             if self.debug:
                 return True, ''
-        
+
             out_bvid = None
             log = ''
             logfile.seek(0)
             for line in logfile.readlines():
                 line = line.decode('utf-8', errors='ignore').strip()
-                log += line+'\n'
+                log += line + '\n'
                 if '\"bvid\"' in line:
                     res = re.search(r'(BV[0-9A-Za-z]{10})', line)
                     if res:  out_bvid = res[0]
-        
+
         if out_bvid:
             return True, out_bvid
         else:
@@ -194,7 +198,7 @@ class biliuprs():
                 try:
                     resp = requests.get(config['cover'], headers={'User-Agent': 'Mozilla/5.0'}, timeout=5.0)
                     resp.raise_for_status()
-                    cover_filename = f'.temp/biliuprs_cover_{int(time.time())+86400}.png'
+                    cover_filename = f'.temp/biliuprs_cover_{int(time.time()) + 86400}.png'
                     with open(cover_filename, 'wb') as f:
                         f.write(resp.content)
                     config['cover'] = cover_filename
@@ -204,29 +208,45 @@ class biliuprs():
                     config['cover'] = ''
         return config
 
-    def upload(self, files:list[VideoInfo], **kwargs):
+    def upload(self, files: list[VideoInfo], **kwargs):
         if not isinstance(files, list):
             files = [files]
         config = self.format_config(kwargs, files[0])
 
         if self._upload_lock.locked():
             self.logger.warning('上传速度慢于录制速度，可能导致上传队列阻塞！')
-        
+
         video_files = [f.path for f in files]
+
+        # --- 新增：时间判断逻辑 ---
+        # 获取外部传入的 bvid（如果有的话）
+        external_bvid = kwargs.get('bvid', None)
+
+        # 决定最终使用的 bvid
+        final_bvid = None
+        if self._should_create_new_work():
+            # 如果在特定时段，强制创建新稿件，忽略传入的 bvid
+            self.logger.info(f"当前时间 {datetime.datetime.now().strftime('%H:%M')} 处于新稿件创建时段，将开始一个新稿件。")
+            final_bvid = None
+        else:
+            # 非特定时段，正常逻辑：优先使用传入的bvid，否则使用任务中记录的bvid
+            final_bvid = external_bvid if external_bvid is not None else self.task_info.get('bvid')
+
+        # 使用最终的 bvid 进行上传
         status, bvid = False, ''
 
-        if self.task_upload_lock:       # 使用串行上传
+        if self.task_upload_lock:  # 使用串行上传
             with self._upload_lock:
-                status, bvid = self.upload_once(video=video_files, bvid=self.task_info.get('bvid'), **config)
+                status, bvid = self.upload_once(video=video_files, bvid=final_bvid, **config)
                 if status:
                     self.task_info['bvid'] = bvid
 
-        else:                           # 完全并行上传
-            if self.task_info.get('bvid') is None:      # 说明第一个任务还未上传，需要阻塞
+        else:  # 完全并行上传
+            if self.task_info.get('bvid') is None:  # 说明第一个任务还未上传，需要阻塞
                 self._upload_lock.acquire()
                 lock_released = False
                 try:
-                    if self.task_info.get('bvid'):      # 说明第一个任务已经上传完成
+                    if self.task_info.get('bvid'):  # 说明第一个任务已经上传完成
                         self._upload_lock.release()
                         lock_released = True
                     status, bvid = self.upload_once(video=video_files, bvid=None, **config)
@@ -259,3 +279,23 @@ class biliuprs():
                 self.logger.debug(out)
         except Exception as e:
             self.logger.debug(e)
+
+    def _should_create_new_work(self):
+        """
+        判断当前是否应该创建新稿件。
+        规则：在凌晨2点或中午12点的后1小时（即2:00-3:00, 12:00-13:00）
+        """
+        now = datetime.datetime.now()
+        current_hour = now.hour
+
+        # 定义需要创建新稿件的时间窗口（小时）
+        new_work_hour_windows = [
+            (2, 3),  # 凌晨 2点到3点
+            (12, 13),  # 中午 12点到13点
+            (18, 19)  # 下午 18点到19点
+        ]
+
+        for start, end in new_work_hour_windows:
+            if start <= current_hour < end:
+                return True
+        return False

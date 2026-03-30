@@ -5,6 +5,9 @@ import re
 import requests
 import json
 import random
+
+from DMR.LiveAPI.bilivideo_utils import encode_wbi, getWbiKeys
+
 try:
     from .BaseAPI import BaseAPI
 except ImportError:
@@ -156,21 +159,114 @@ class bilibili(BaseAPI):
 
     def get_info(self) -> tuple:
         try:
-            resp = self.sess.get(f'https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id={self.rid}', headers=self.header, timeout=5).json()
+            # 先获取room_id（如果传入的是短号）
+            try:
+                resp_init = self.sess.get(
+                    f'https://api.live.bilibili.com/room/v1/Room/room_init?id={self.rid}',
+                    headers=self.header,
+                    timeout=5
+                ).json()
+                room_id = resp_init["data"]["room_id"]
+            except:
+                room_id = self.rid
+
+            # 从 cookie 文件加载 cookie（类似 biliuprs 的做法）
+            cookie_file = '.login_info/bilibili.json'
+            watch_cookies = {}
+
+            if os.path.exists(cookie_file):
+                try:
+                    with open(cookie_file, 'r') as f:
+                        cookies_data = json.load(f)
+                    # 从 cookie_info.cookies 中提取 cookie 字典
+                    watch_cookies = {c['name']: c['value'] for c in cookies_data['cookie_info']['cookies']}
+                    logger.info(f'正在使用 {cookie_file} 的cookies登录B站获取房间信息.')
+                except Exception as e:
+                    logger.warning(f'B站观看cookies读取错误:{e}')
+
+            # 更新 session 的 cookies
+            for name, value in watch_cookies.items():
+                self.sess.cookies.set(name, value, domain='.bilibili.com')
+
+            # 检查是否有 buvid3 和 buvid4
+            session_cookies = self.sess.cookies.get_dict()
+            has_buvid3 = 'buvid3' in session_cookies
+            has_buvid4 = 'buvid4' in session_cookies
+
+            if not has_buvid3 or not has_buvid4:
+                try:
+                    # 获取 buvid 时不带 cookie（避免循环依赖）
+                    resp_buvid = requests.get(
+                        "https://api.bilibili.com/x/frontend/finger/spi",
+                        timeout=5,
+                        headers={'User-Agent': self.header['User-Agent']}
+                    ).json()
+
+                    if resp_buvid['code'] == 0:
+                        buvid3 = resp_buvid['data']['b_3']
+                        buvid4 = resp_buvid['data']['b_4']
+
+                        # 设置到 session 的 cookies 中
+                        self.sess.cookies.set('buvid3', buvid3, domain='.bilibili.com')
+                        self.sess.cookies.set('buvid4', buvid4, domain='.bilibili.com')
+
+                        logger.debug(f"已设置 buvid3: {buvid3[:20]}...")
+
+                        # 更新 watch_cookies（如果需要保存到文件）
+                        watch_cookies['buvid3'] = buvid3
+                        watch_cookies['buvid4'] = buvid4
+                    else:
+                        logger.warning(f"获取 buvid 失败: {resp_buvid.get('message')}")
+
+                except Exception as e:
+                    logger.warning(f"获取 buvid 异常: {e}")
+
+            # 构建 header 中的 cookie 字符串
+            if watch_cookies:
+                cookie_items = [f'{k}={v}' for k, v in watch_cookies.items()]
+                cookie_str = '; '.join(cookie_items)
+                self.header['cookie'] = cookie_str
+
+            # 使用 WBI 签名参数
+            encoded_params = encode_wbi(
+                params={
+                    "room_id": room_id,
+                },
+                wbi_img=getWbiKeys(),
+            )
+
+            # 使用签名后的参数请求
+            resp = self.sess.get(
+                'https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom',
+                headers=self.header,
+                params=encoded_params,
+                timeout=5
+            ).json()
+
+            if resp.get('code') != 0:
+                raise Exception(f"API返回错误: {resp.get('message', '未知错误')}")
+
             data = resp['data']
-            
+
             title = data['room_info']['title']
             uname = data['anchor_info']['base_info']['uname']
             face_url = data['anchor_info']['base_info']['face']
             cover_url = data['room_info']['cover']
-        
+
         # 海外服务器可能报错就用下面的方法
         except Exception as e:
-            resp = self.sess.get(f'https://api.live.bilibili.com/room/v1/Room/get_info?room_id={self.rid}', headers=self.header, timeout=5).json()
+            logger.warning(f"主接口失败: {e}, 尝试备用接口")
+
+            # 备用接口不需要 WBI 签名
+            resp = self.sess.get(
+                f'https://api.live.bilibili.com/room/v1/Room/get_info?room_id={room_id if "room_id" in locals() else self.rid}',
+                headers=self.header, timeout=5).json()
             title = resp['data']['title']
             cover_url = resp['data']['user_cover']
 
-            resp = self.sess.get(f'https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={self.rid}', headers=self.header, timeout=5).json()
+            resp = self.sess.get(
+                f'https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={room_id if "room_id" in locals() else self.rid}',
+                headers=self.header, timeout=5).json()
             info = resp['data']['info']
             uname = info['uname']
             face_url = info['face']
