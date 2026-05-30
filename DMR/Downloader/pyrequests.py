@@ -84,14 +84,14 @@ class PyRequestsFlvDownloader:
     def start(self):
         self.logger.debug(f'{self.taskname} PyRequestsFlv: {self.stream_url}')
 
-        stream = self.session.get(self.stream_url, headers=self.header, stream=True)
-        if stream.status_code != 200:
-            raise RuntimeError(f'Error downloading stream: {stream.status_code}')
-        stream_iter = stream.iter_content(chunk_size=512*1024)
-        
+        # 将 HTTP 请求移入循环，每个分段独立连接以获取完整 FLV 头
         while not self.stoped:
             try:
-                self._download_part(stream_iter)
+                with self.session.get(self.stream_url, headers=self.header, stream=True) as stream:
+                    if stream.status_code != 200:
+                        raise RuntimeError(f'Error downloading stream: {stream.status_code}')
+                    stream_iter = stream.iter_content(chunk_size=512*1024)
+                    self._download_part(stream_iter)
             except Exception as e:
                 self.logger.debug(f'{self.taskname} Error downloading stream: {e}')
                 raise e
