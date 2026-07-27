@@ -54,16 +54,17 @@ class DmRender(BaseRender):
 
         if platform.system().lower() == 'windows':
             danmaku = danmaku.replace("\\", "/").replace(":/", "\\:/")
-        
+
         # 自定义video filter
         if self.advanced_render_args.get('filter_complex'):
             filter_name = '-filter_complex'
             filter_str = self.advanced_render_args.get('filter_complex')
-            filter_str = replace_keywords(filter_str, {'danmaku': danmaku})
+            watermark_filters = ",drawtext=text='德云色录播bot':fontfile='C\:/Windows/Fonts/msyh.ttc':fontsize=20:fontcolor=white@0.4:x=20:y=20:enable='lt(mod(t,240),30)',drawtext=text='德云色录播bot':fontfile='C\:/Windows/Fonts/msyh.ttc':fontsize=20:fontcolor=white@0.4:x=w-tw-20:y=20:enable='gte(mod(t,240),60)*lt(mod(t,240),90)',drawtext=text='德云色录播bot':fontfile='C\:/Windows/Fonts/msyh.ttc':fontsize=20:fontcolor=white@0.4:x=w-tw-20:y=h-th-20:enable='gte(mod(t,240),120)*lt(mod(t,240),150)',drawtext=text='德云色录播bot':fontfile='C\:/Windows/Fonts/msyh.ttc':fontsize=20:fontcolor=white@0.4:x=20:y=h-th-20:enable='gte(mod(t,240),180)*lt(mod(t,240),210)'"
+            filter_str = replace_keywords(filter_str, {'danmaku': danmaku}) + watermark_filters
         else:
             filter_name = '-vf'
             filter_str = 'subtitles=filename=\'%s\'' % danmaku
-        
+
         ffmpeg_args += [
             '-fflags', '+discardcorrupt+genpts',
             '-analyzeduration', '2147483647', '-probesize', '2147483647',
@@ -90,12 +91,12 @@ class DmRender(BaseRender):
         valid_output = safe_filename(output)
         if valid_output != output:
             self.logger.warning(f'输出文件名 {output} 不合法或已存在，已更改为 {valid_output}.')
-            output = valid_output   
+            output = valid_output
 
         start_time = datetime.now()
         status, info = self.render_helper(video.path, danmaku, output, **kwargs)
         if status:
-            output_info:VideoInfo = copy.deepcopy(video)
+            output_info: VideoInfo = copy.deepcopy(video)
             output_info.dtype = 'dm_video'
             output_info.path = output
             output_info.file_id = uuid()

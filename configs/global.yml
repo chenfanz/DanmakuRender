@@ -151,7 +151,7 @@ download_args:
       # 弹幕类型过滤，只获取指定类型的弹幕，支持情况请参考文档
       # 可选值：all（所有）, danmaku（纯弹幕）, gift（礼物信息）, entry（进场信息）, superchat（超级弹幕）
       # 默认只获取文字弹幕(danmaku)
-      dm_type: ~
+      dm_type: [danmaku,superchat]
       # 关键字过滤，只要有关键字的弹幕都会被过滤
       # 例如：[菜, fw]
       keywords: ~
@@ -172,7 +172,7 @@ download_args:
     advanced_dm_args:
       # 弹幕延迟补偿(秒)，将弹幕强行提前
       # 也可以设置为负数延后弹幕
-      dm_delay_fixed: 6
+      dm_delay_fixed: 0
       # 弹幕超时自动重启（秒），超过一段时间无弹幕会自动重启弹幕录制，0表示关闭
       dm_auto_restart: 300
       # 额外弹幕流输入
@@ -310,7 +310,7 @@ render_args:
     advanced_render_args:
       # 直接定义video filter，这里的{DANMAKU}代表弹幕文件路径
       # 注意设置filter_complex之后将会禁用fps等其他有关filter的选项
-      filter_complex: subtitles=filename='{DANMAKU}'
+      filter_complex: 'fps=fps=60,subtitles=filename={DANMAKU}'
   # 原视频转码
   transcode:
     # 渲染输出文件夹，默认为在录制输出文件夹后面加上“转码后”
