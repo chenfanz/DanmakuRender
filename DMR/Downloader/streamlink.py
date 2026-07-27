@@ -1,5 +1,7 @@
 import logging
 import random
+import logging
+import random
 import subprocess
 import re
 import glob
@@ -14,7 +16,7 @@ from DMR.LiveAPI import Onair
 
 
 class StreamlinkDownloader():
-    def __init__(self,  
+    def __init__(self,
                  output_dir:str,
                  segment:int,
                  url:str,
@@ -23,7 +25,7 @@ class StreamlinkDownloader():
                  debug=False,
                  segment_callback=None,
                  **kwargs):
-        
+
         self.output_dir = output_dir
         self.output_format = output_format
         self.segment = segment
@@ -36,9 +38,25 @@ class StreamlinkDownloader():
         self.advanced_video_args = kwargs.get('advanced_video_args', {})
         self.logger = logging.getLogger(__name__)
         self.stoped = False
-    
+
     def start_helper(self):
-        raw_name = join(self.output_dir, f'[正在录制]{self.taskname}-{time.strftime("%Y%m%d%H%M%S",time.localtime())}-Part%03d-{self.uuid}.{self.output_format}')
+        # ---------- 自动从 .login_info/bilibili.json 加载 Cookie ----------
+        login_file = os.path.join('.login_info', 'bilibili.json')
+        file_cookies_args = []
+        if os.path.exists(login_file):
+            try:
+                with open(login_file, 'r', encoding='utf-8') as f:
+                    login_data = json.load(f)
+                cookies = login_data.get('cookie_info', {}).get('cookies', [])
+                for c in cookies:
+                    if c['name'] in ['SESSDATA', 'bili_jct', 'DedeUserID']:
+                        file_cookies_args += ['--http-cookie', f"{c['name']}={c['value']}"]
+            except Exception as e:
+                self.logger.warning(f'读取登录信息失败: {e}，将不注入Cookie')
+        # ----------------------------------------------------------------
+
+        raw_name = join(self.output_dir,
+                        f'[正在录制]{self.taskname}-{time.strftime("%Y%m%d%H%M%S", time.localtime())}-Part%03d-{self.uuid}.{self.output_format}')
 
         port = random.randint(10000, 65535)
         streamlink_extra_args = self.advanced_video_args.get('streamlink_extra_args') or []
@@ -48,10 +66,24 @@ class StreamlinkDownloader():
             "--player-external-http",  # 为外部程序提供流媒体数据
             "--player-external-http-port", str(port),  # 对外部输出流的端口
             *streamlink_extra_args,
+            *file_cookies_args,  # 自动注入的Cookie（后置可覆盖手动配置）
             self.url,
             streamlink_quality,
         ]
-        self.logger.debug(f'{self.taskname} streamlink args: {streamlink_args}')
+
+        # 日志脱敏：隐藏Cookie值
+        safe_args = []
+        hide_next = False
+        for a in streamlink_args:
+            if hide_next:
+                safe_args.append('***')
+                hide_next = False
+            elif a == '--http-cookie':
+                safe_args.append(a)
+                hide_next = True
+            else:
+                safe_args.append(a)
+        self.logger.debug(f'{self.taskname} streamlink args: {safe_args}')
 
         ffmpeg_args = [
             ToolsList.get('ffmpeg'),
@@ -85,7 +117,7 @@ class StreamlinkDownloader():
                 logfile.seek(0)
                 log = logfile.read().decode('utf8', errors='ignore')
                 raise RuntimeError(f'{self.taskname} Streamlink启动失败: {log}')
-            
+
             self.ffmpeg_proc = subprocess.Popen(ffmpeg_args, stdin=subprocess.PIPE, stdout=logfile, stderr=subprocess.STDOUT)
             self.lastfile = None
             while not self.stoped:
@@ -104,7 +136,7 @@ class StreamlinkDownloader():
                         self.lastfile = files[p]
                         self.segment_callback(self.lastfile)
                 time.sleep(10)
-            
+
             if not self.stoped and Onair(self.url):
                 logfile.seek(0)
                 log = logfile.read().decode('utf8', errors='ignore')
@@ -114,7 +146,7 @@ class StreamlinkDownloader():
         # 生成一个uuid，用于标记这次录制的文件
         self.uuid = uuid(8)
         return self.start_helper()
-    
+
     def stop(self):
         self.stoped = True
         try:
@@ -124,10 +156,10 @@ class StreamlinkDownloader():
             self.logger.debug(e)
         finally:
             out, _ = self.streamlink_proc.communicate(timeout=0.1)
-            if out: 
+            if out:
                 self.logger.debug(f'{self.taskname} streamlink: {out}')
             out, _ = self.ffmpeg_proc.communicate(timeout=0.1)
-            if out: 
+            if out:
                 self.logger.debug(f'{self.taskname} streamlink: {out}')
 
         files = sorted(glob.glob(join(self.output_dir, f'*{self.uuid}*')))
@@ -140,5 +172,5 @@ class StreamlinkDownloader():
             for p in range(pos+1, len(files)):
                 self.lastfile = files[p]
                 self.segment_callback(self.lastfile)
-        
+
         self.logger.debug('Streamlink downloader stoped.')
