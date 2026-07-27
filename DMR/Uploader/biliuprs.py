@@ -234,7 +234,7 @@ class biliuprs():
 
         if self.task_upload_lock:       # 使用串行上传
             with self._upload_lock:
-                status, bvid = self.upload_once(video=video_files, bvid=self.task_info.get('bvid'), **config)
+                status, bvid = self.upload_once(video=video_files, bvid=final_bvid, **config)
                 if status:
                     self.task_info['bvid'] = bvid
 
