@@ -59,12 +59,12 @@ download_args:
       # 斗鱼可选 hs-h5 或者默认 (https://github.com/SmallPeaches/DanmakuRender/issues/506)
       # 或者正则匹配特定CDN，例如：.*cn-gotcha.*
       # 默认为空，由程序随机选择可用cdn
-      stream_cdn: ~
+      stream_cdn: .*cn-gotcha\d+b.*
       # 直播流类型（暂时只对B站生效）可选flv，hls，avc，hevc，av1
       # 注意hls流无法使用streamgears录制
       # 如果需要同时指定codec类型，请使用'type-codec'的格式，例如：flv-avc
       # 默认为空，由程序自动选择
-      stream_type: ~
+      stream_type: flv-hevc
       # B站观看cookies，用于获取直播流，如果不填写则使用登录B站上传视频的cookies
       # 如果希望不登录录制最低画质，请设置为'None'
       bili_watch_cookies: .login_info/bili_watch_cookies.json
