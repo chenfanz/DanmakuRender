@@ -111,6 +111,7 @@ download_args:
       streamlink_extra_args: [
         "--twitch-disable-ads",     # 去广告，去掉、跳过嵌入的广告流
         "--twitch-disable-reruns",  # 如果该频道正在重放回放，不打开流
+        "--hls-live-restart"
       ]
 
     # 以下是弹幕录制参数
