@@ -78,7 +78,7 @@ class bilibili(BaseAPI):
             'protocol': '0,1',
             'format': '0,1,2',
             'codec': '0,1,2',   # 0:avc, 1:hevc, 2:av1
-            'qn': 25000,
+            'qn': 10000,
             'ptype': 8,
             'dolby': 5,
             'panorama': 1
