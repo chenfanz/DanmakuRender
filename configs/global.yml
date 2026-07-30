@@ -64,7 +64,7 @@ download_args:
       # 注意hls流无法使用streamgears录制
       # 如果需要同时指定codec类型，请使用'type-codec'的格式，例如：flv-avc
       # 默认为空，由程序自动选择
-      stream_type: flv-avc
+      stream_type: avc
       # B站观看cookies，用于获取直播流，如果不填写则使用登录B站上传视频的cookies
       # 如果希望不登录录制最低画质，请设置为'None'
       bili_watch_cookies: .login_info/bili_watch_cookies.json
