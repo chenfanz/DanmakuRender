@@ -227,7 +227,7 @@ class biliuprs():
     def _should_create_new_work(self):
         now = datetime.datetime.now()
         current_hour = now.hour
-        windows = [(2, 3), (12, 13), (17, 19)]
+        windows = [(2, 3), (12, 13), (18, 19)]
 
         window_start = None
         for start, end in windows:
@@ -246,7 +246,7 @@ class biliuprs():
     def _mark_window_triggered(self):
         now = datetime.datetime.now()
         current_hour = now.hour
-        windows = [(2, 3), (12, 13), (17, 19)]
+        windows = [(2, 3), (12, 13), (18, 19)]
         for start, end in windows:
             if start <= current_hour < end:
                 with self._window_lock:
