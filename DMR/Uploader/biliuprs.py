@@ -10,7 +10,6 @@ import datetime
 import requests
 
 from DMR.utils import replace_keywords, ToolsList, VideoInfo
-from DMR.LiveAPI.bilibili import bilibili as BiliLiveAPI
 
 
 class biliuprs():
@@ -46,9 +45,10 @@ class biliuprs():
         self.logger = logging.getLogger(__name__)
         self.stoped = False
 
-        # 窗口控制
-        self._new_work_window_triggered = None
+        # ---------- 新增：时间窗口控制 ----------
+        self._new_work_window_triggered = None   # 记录已触发新建的窗口起始小时
         self._window_lock = threading.Lock()
+        # -------------------------------------
 
         if not self.islogin():
             self.login()
@@ -56,9 +56,26 @@ class biliuprs():
     def __del__(self):
         self.stop()
 
-    def call_biliuprs(self, video, bvid=None, copyright=1, cover='', desc='', dtime=0, dynamic='',
-                      line=None, limit=3, no_reprint=1, source='', tag='', tid=65, title='',
-                      extra_args=None, timeout=None, logfile=None, **kwargs):
+    def call_biliuprs(self,
+                      video,
+                      bvid: str = None,
+                      copyright: int = 1,
+                      cover: str = '',
+                      desc: str = '',
+                      dtime: int = 0,
+                      dynamic: str = '',
+                      line: str = None,
+                      limit: int = 3,
+                      no_reprint: int = 1,
+                      source: str = '',
+                      tag: str = '',
+                      tid: int = 65,
+                      title: str = '',
+                      extra_args: list = None,
+                      timeout: int = None,
+                      logfile=None,
+                      **kwargs
+                      ):
         if bvid:
             upload_args = self.base_args + ['append', '--vid', bvid]
         else:
@@ -98,8 +115,8 @@ class biliuprs():
             upload_proc = subprocess.Popen(upload_args, stdin=subprocess.PIPE, stdout=sys.stdout,
                                            stderr=subprocess.STDOUT, bufsize=10 ** 8)
         else:
-            upload_proc = subprocess.Popen(upload_args, stdin=subprocess.PIPE, stdout=logfile,
-                                           stderr=subprocess.STDOUT, bufsize=10 ** 8)
+            upload_proc = subprocess.Popen(upload_args, stdin=subprocess.PIPE, stdout=logfile, stderr=subprocess.STDOUT,
+                                           bufsize=10 ** 8)
 
         try:
             self._upload_procs[upload_proc.pid] = upload_proc
@@ -117,8 +134,8 @@ class biliuprs():
 
     def islogin(self):
         renew_args = self.base_args + ['renew']
-        proc = subprocess.Popen(renew_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, bufsize=10 ** 8)
+        proc = subprocess.Popen(renew_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                bufsize=10 ** 8)
         out = proc.stdout.read().decode('utf-8')
         return 'error' not in out.lower()
 
@@ -148,7 +165,8 @@ class biliuprs():
                 log += line + '\n'
                 if '\"bvid\"' in line:
                     res = re.search(r'(BV[0-9A-Za-z]{10})', line)
-                    if res:  out_bvid = res[0]
+                    if res:
+                        out_bvid = res[0]
 
         if out_bvid:
             return True, out_bvid
@@ -157,6 +175,7 @@ class biliuprs():
 
     def format_config(self, config, video_info=None, replace_invalid=False):
         config = config.copy()
+
         if config.get('title'):
             config['title'] = replace_keywords(config['title'], video_info, replace_invalid=replace_invalid)
             if len(config['title']) > 80:
@@ -187,10 +206,11 @@ class biliuprs():
                     config['cover'] = ''
         return config
 
-    # --------------- 新增/修改的辅助方法 ---------------
+    # ---------- 新增辅助方法 ----------
     def _get_live_title(self, room_id):
-        """复用项目 B 站 API 获取直播间当前标题"""
+        """获取直播间当前标题（复用项目内的 B 站 API）"""
         try:
+            from DMR.LiveAPI.bilibili import bilibili as BiliLiveAPI
             live_api = BiliLiveAPI(room_id)
             title, _, _, _ = live_api.get_info()
             self.logger.debug(f'获取到直播间 {room_id} 标题: {title}')
@@ -199,32 +219,11 @@ class biliuprs():
             self.logger.error(f'获取直播间 {room_id} 标题失败: {e}')
             return None
 
-    def _update_title_for_append(self, config, video_info, bvid):
-        """追加稿件时，用直播间最新标题更新 config"""
-        if bvid is None:
-            return config
-
-        try:
-            room_id = video_info.streamer.url.rstrip('/').split('/')[-1]
-            if not room_id.isdigit():
-                self.logger.debug(f'无法提取房间号: {video_info.streamer.url}')
-                return config
-        except Exception as e:
-            self.logger.debug(f'解析房间号失败: {e}')
-            return config
-
-        new_title = self._get_live_title(room_id)
-        if not new_title:
-            return config
-
-        # 临时替换 title，重新格式化 config（保证其他模板变量不变）
-        original_title = video_info.title
-        video_info.title = new_title
-        new_config = self.format_config(config.copy(), video_info)
-        video_info.title = original_title
-        return new_config
-
     def _should_create_new_work(self):
+        """
+        判断当前是否应该创建新稿件（每个窗口仅触发一次）。
+        窗口：2:00-3:00, 12:00-13:00, 18:00-19:00
+        """
         now = datetime.datetime.now()
         current_hour = now.hour
         windows = [(2, 3), (12, 13), (18, 19)]
@@ -244,6 +243,7 @@ class biliuprs():
         return True
 
     def _mark_window_triggered(self):
+        """标记当前窗口已成功新建过稿件"""
         now = datetime.datetime.now()
         current_hour = now.hour
         windows = [(2, 3), (12, 13), (18, 19)]
@@ -254,7 +254,35 @@ class biliuprs():
                 self.logger.debug(f"已标记 {start}-{end} 时间窗口新建完成。")
                 break
 
+    def _update_title_for_append(self, config, video_info, bvid):
+        """
+        仅在追加稿件时，将 config 中的 {TITLE} 替换为直播间最新标题。
+        """
+        if bvid is None:
+            return config
+
+        try:
+            room_id = video_info.streamer.url.rstrip('/').split('/')[-1]
+            if not room_id.isdigit():
+                return config
+        except Exception:
+            return config
+
+        new_title = self._get_live_title(room_id)
+        if not new_title:
+            return config
+
+        updated_config = config.copy()
+        for key in ['title', 'desc', 'dynamic']:
+            if key in updated_config and '{TITLE}' in str(updated_config[key]):
+                updated_config[key] = updated_config[key].replace('{TITLE}', new_title)
+                self.logger.info(f'追加稿件 {key} 已更新为最新标题: {new_title}')
+        return updated_config
+
     def _upload_with_retry(self, video_files, bvid, config):
+        """
+        上传，若因“稿件已锁定”失败且 bvid 不为空，则自动重试为新建稿件。
+        """
         status, result = self.upload_once(video=video_files, bvid=bvid, **config)
         if status:
             return True, result
@@ -270,13 +298,13 @@ class biliuprs():
                 return False, new_bvid
         else:
             return False, result
-
-    # ------------------------------------------------
+    # ------------------------------------
 
     def upload(self, files: list, **kwargs):
         if not isinstance(files, list):
             files = [files]
         config = self.format_config(kwargs, files[0])
+        # 移除可能存在的 bvid，防止调用 upload_once 时参数冲突
         config.pop('bvid', None)
 
         video_files = [f.path for f in files]
@@ -291,15 +319,16 @@ class biliuprs():
 
         status, bvid = False, ''
 
-        if self.task_upload_lock:  # 串行
+        if self.task_upload_lock:          # 串行上传
             with self._upload_lock:
+                # 追加时更新标题
                 config = self._update_title_for_append(config, files[0], final_bvid)
                 status, bvid = self._upload_with_retry(video_files, final_bvid, config)
                 if status:
                     self.task_info['bvid'] = bvid
-                    if force_new:
+                    if force_new:          # 窗口新建成功，标记
                         self._mark_window_triggered()
-        else:  # 并行
+        else:                              # 并行上传（保留原有结构，加入窗口和标题更新）
             if self.task_info.get('bvid') is None:
                 self._upload_lock.acquire()
                 lock_released = False
@@ -321,11 +350,11 @@ class biliuprs():
                     if not lock_released:
                         self._upload_lock.release()
             else:
-                if final_bvid is None and self.task_info.get('bvid') is not None:
+                bvid_to_use = self.task_info.get('bvid')
+                # 若窗口判断需新建，且已有旧bvid，则强制None
+                if final_bvid is None and bvid_to_use is not None:
                     bvid_to_use = None
                     self.logger.debug("时间窗口强制新建稿件，将忽略已存在的 bvid。")
-                else:
-                    bvid_to_use = self.task_info.get('bvid')
                 config = self._update_title_for_append(config, files[0], bvid_to_use)
                 status, bvid = self._upload_with_retry(video_files, bvid_to_use, config)
                 if status:
